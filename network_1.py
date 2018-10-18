@@ -1,8 +1,8 @@
-'''
-Created on Oct 12, 2016
+#Laura Sullivan-Russett and Grace Walkuski
+#CSCI 466
+#PA3
+#November 2, 2018
 
-@author: mwittie
-'''
 import queue
 import threading
 

@@ -1,8 +1,8 @@
-'''
-Created on Oct 12, 2016
+#Laura Sullivan-Russett and Grace Walkuski
+#CSCI 466
+#PA3
+#November 2, 2018
 
-@author: mwittie
-'''
 import queue
 import threading
 
@@ -28,10 +28,7 @@ class Interface:
         self.queue.put(pkt, block)
         
         
-## Implements a network layer packet (different from the RDT packet 
-# from programming assignment 2).
-# NOTE: This class will need to be extended to for the packet to include
-# the fields necessary for the completion of this assignment.
+## Implements a network layer packet 
 class NetworkPacket:
     ## packet encoding lengths 
     dst_addr_S_length = 5
@@ -40,6 +37,9 @@ class NetworkPacket:
     frag_flag_S_length = 1
     
     ##@param dst_addr: address of the destination host
+    #@param id_num: id number of packet for identification of packet fragments
+    #@frag_offset: offset value of packet fragment for reassembly
+    #@frag_falg: flag indicating whether the fragment is the last of a packet
     # @param data_S: packet payload
     def __init__(self, dst_addr, id_num, frag_offset, frag_flag, data_S):
         self.dst_addr = dst_addr
@@ -66,10 +66,7 @@ class NetworkPacket:
     @classmethod
     def from_byte_S(self, byte_S):
         dst_addr = int(byte_S[0 : NetworkPacket.dst_addr_S_length])
-        print(NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length)
         id_num = int(byte_S[NetworkPacket.dst_addr_S_length : NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length])
-        print(NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length)
-        print(NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length)
         frag_offset = int(byte_S[NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length : NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length])
         frag_flag = int(byte_S[NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length : NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length+1])
         data_S = byte_S[NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length+1 : ]
