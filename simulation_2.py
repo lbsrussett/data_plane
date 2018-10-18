@@ -3,8 +3,8 @@ Created on Oct 12, 2016
 
 @author: mwittie
 '''
-import network_1
-import link_1
+import network_2
+import link_2
 import threading
 from time import sleep
 
@@ -16,21 +16,21 @@ if __name__ == '__main__':
     object_L = [] #keeps track of objects, so we can kill their threads
     
     #create network nodes
-    client = network_1.Host(1)
+    client = network_2.Host(1)
     object_L.append(client)
-    server = network_1.Host(2)
+    server = network_2.Host(2)
     object_L.append(server)
-    router_a = network_1.Router(name='A', intf_count=1, max_queue_size=router_queue_size)
+    router_a = network_2.Router(name='A', intf_count=1, max_queue_size=router_queue_size)
     object_L.append(router_a)
     
     #create a Link Layer to keep track of links between network nodes
-    link_layer = link_1.LinkLayer()
+    link_layer = link_2.LinkLayer()
     object_L.append(link_layer)
     
     #add all the links
     #link parameters: from_node, from_intf_num, to_node, to_intf_num, mtu
-    link_layer.add_link(link_1.Link(client, 0, router_a, 0, 50))
-    link_layer.add_link(link_1.Link(router_a, 0, server, 0, 50))
+    link_layer.add_link(link_2.Link(client, 0, router_a, 0, 50))
+    link_layer.add_link(link_2.Link(router_a, 0, server, 0, 50))
     
     
     #start all the objects
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     
     #create some send events    
     for i in range(3):
-        client.udt_send(2, 'Sample data %d that is too long to deliver through the current MTU length of 50 characters.' % i)
+        client.udt_send(2, i, 0, 1, 'Sample data %d that is too long to deliver through the current MTU length of 50 characters.' % i)
     
     
     #give the network sufficient time to transfer all packets before quitting
