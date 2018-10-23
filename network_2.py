@@ -39,7 +39,7 @@ class NetworkPacket:
     ##@param dst_addr: address of the destination host
     #@param id_num: id number of packet for identification of packet fragments
     #@frag_offset: offset value of packet fragment for reassembly
-    #@frag_falg: flag indicating whether the fragment is the last of a packet
+    #@frag_flag: flag indicating whether the fragment is the last of a packet
     # @param data_S: packet payload
     def __init__(self, dst_addr, id_num, frag_offset, frag_flag, data_S):
         self.dst_addr = dst_addr
@@ -101,7 +101,21 @@ class Host:
     def udt_receive(self):
         pkt_S = self.in_intf_L[0].get()
         if pkt_S is not None:
-            print('%s: received packet "%s" on the in interface' % (self, pkt_S))
+            
+            p = NetworkPacket.from_byte_S(pkt_S)
+            if p.frag_flag == 0:
+                print('%s: received packet "%s" on the in interface' % (self, pkt_S))
+            else:
+                print('Packet was fragmented. Reconstructing.\n')
+                pkt_S2 = self.in_intf_L[0].get()
+                if pkt_S2 is not None:
+                    # print(pkt_S2)
+                    p2 = NetworkPacket.from_byte_S(pkt_S2)
+                    if p.id_num == p2.id_num and p2.frag_flag == 0:
+                        p.frag_flag = 0
+                        recon_pkt_S = p.to_byte_S() + pkt_S2[p2.frag_offset:]
+                        print('%s: reconstructed packet "%s" on the in interface' % (self, recon_pkt_S))
+
        
     ## thread target for the host to keep receiving data
     def run(self):
@@ -144,6 +158,14 @@ class Router:
                 #if packet exists make a forwarding decision
                 if pkt_S is not None:
                     p = NetworkPacket.from_byte_S(pkt_S) #parse a packet out
+                    if len(pkt_S) > self.out_intf_L[i].mtu:
+                        frag1 = NetworkPacket.from_byte_S(pkt_S[:self.out_intf_L[i].mtu])
+                        frag1.frag_flag = 1
+                        frag2 = NetworkPacket.from_byte_S(pkt_S[:13] + pkt_S[self.out_intf_L[i].mtu:])
+                        frag2.frag_flag = 0
+                        frag2.frag_offset = self.out_intf_L[i].mtu+13
+                        self.out_intf_L[i].put(frag1.to_byte_S(), True)
+                        self.out_intf_L[i].put(frag2.to_byte_S(), True)
                     # HERE you will need to implement a lookup into the 
                     # forwarding table to find the appropriate outgoing interface
                     # for now we assume the outgoing interface is also i

@@ -30,7 +30,7 @@ if __name__ == '__main__':
     #add all the links
     #link parameters: from_node, from_intf_num, to_node, to_intf_num, mtu
     link_layer.add_link(link_2.Link(client, 0, router_a, 0, 50))
-    link_layer.add_link(link_2.Link(router_a, 0, server, 0, 50))
+    link_layer.add_link(link_2.Link(router_a, 0, server, 0, 30))
     
     
     #start all the objects
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     
     #create some send events    
     for i in range(3):
-        client.udt_send(2, i, 0, 1, 'Sample data %d that is too long to deliver through the current MTU length of 50 characters.' % i)
+        client.udt_send(2, i, 0, 0, 'Sample data %d that is too long to deliver through the current MTU length of 50 characters.' % i)
     
     
     #give the network sufficient time to transfer all packets before quitting

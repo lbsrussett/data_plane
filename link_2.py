@@ -37,18 +37,22 @@ class Link:
         if pkt_S is None:
             return #return if no packet to transfer
         if len(pkt_S) > self.out_intf.mtu:
-            print('%s: packet "%s" length greater then link mtu (%d)' % (self, pkt_S, self.out_intf.mtu))
-            print('The packet is being divided into two separate packets.\n')
-            #the packet is too long for the MTU settings, so break the packet into 2 packets
-            #create the first packet out of the first 50 characters
-            pkt_S1 = pkt_S[:50] 
-            #create the second packet by adding the destination address to 
-            #the remaining characters in the sample data
-            pkt_S2 = pkt_S[:13] + pkt_S[50:] 
-            #send both new packets through the out interface
-            self.out_intf.put(pkt_S1)
-            self.out_intf.put(pkt_S2)
-            return #return without transmitting if packet too big
+        	if self.out_intf.mtu == 50:
+	            print('%s: packet "%s" length greater then link mtu (%d)' % (self, pkt_S, self.out_intf.mtu))
+	            print('The packet is being divided into two separate packets.\n')
+	            #the packet is too long for the MTU settings, so break the packet into 2 packets
+	            #create the first packet out of the first 50 characters
+	            pkt_S1 = pkt_S[:50] 
+	            #create the second packet by adding the destination address to 
+	            #the remaining characters in the sample data
+	            pkt_S2 = pkt_S[:13] + pkt_S[50:] 
+	            #send both new packets through the out interface
+	            self.out_intf.put(pkt_S1)
+	            self.out_intf.put(pkt_S2)
+	        elif self.out_intf.mtu == 30:
+	        	self.out_intf.put(pkt_S)
+	        	print('%s: transmitting packet "%s"' % (self, pkt_S))
+	        return #return without transmitting if packet too big
         #otherwise transmit the packet
         try:
             self.out_intf.put(pkt_S)
