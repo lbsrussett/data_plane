@@ -30,7 +30,8 @@ class Interface:
         
 ## Implements a network layer packet 
 class NetworkPacket:
-    ## packet encoding lengths 
+    ## packet encoding lengths
+    src_addr_S_length = 5 
     dst_addr_S_length = 5
     id_num_S_length = 2
     frag_offset_S_length = 5
@@ -41,7 +42,8 @@ class NetworkPacket:
     #@frag_offset: offset value of packet fragment for reassembly
     #@frag_flag: flag indicating whether the fragment is the last of a packet
     # @param data_S: packet payload
-    def __init__(self, dst_addr, id_num, frag_offset, frag_flag, data_S):
+    def __init__(self, src_addr, dst_addr, id_num, frag_offset, frag_flag, data_S):
+        self.src_addr = src_addr
         self.dst_addr = dst_addr
         self.id_num = id_num
         self.frag_offset = frag_offset
@@ -54,7 +56,8 @@ class NetworkPacket:
         
     ## convert packet to a byte string for transmission over links
     def to_byte_S(self):
-        byte_S = str(self.dst_addr).zfill(self.dst_addr_S_length)
+        byte_S = str(self.src_addr).zfill(self.src_addr_S_length)
+        byte_S += str(self.dst_addr).zfill(self.dst_addr_S_length)
         byte_S += str(self.id_num).zfill(self.id_num_S_length)
         byte_S += str(self.frag_offset).zfill(self.frag_offset_S_length)
         byte_S += str(self.frag_flag)
@@ -65,12 +68,13 @@ class NetworkPacket:
     # @param byte_S: byte string representation of the packet
     @classmethod
     def from_byte_S(self, byte_S):
-        dst_addr = int(byte_S[0 : NetworkPacket.dst_addr_S_length])
-        id_num = int(byte_S[NetworkPacket.dst_addr_S_length : NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length])
-        frag_offset = int(byte_S[NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length : NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length])
-        frag_flag = int(byte_S[NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length : NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length+1])
-        data_S = byte_S[NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length+1 : ]
-        return self(dst_addr, id_num, frag_offset, frag_flag, data_S)
+        src_addr = int(byte_S[0:NetworkPacket.src_addr_S_length])
+        dst_addr = int(byte_S[NetworkPacket.src_addr_S_length : NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length])
+        id_num = int(byte_S[NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length : NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length])
+        frag_offset = int(byte_S[NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length : NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length])
+        frag_flag = int(byte_S[NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length : NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length+1])
+        data_S = byte_S[NetworkPacket.src_addr_S_length+NetworkPacket.dst_addr_S_length+NetworkPacket.id_num_S_length+NetworkPacket.frag_offset_S_length+1 : ]
+        return self(src_addr, dst_addr, id_num, frag_offset, frag_flag, data_S)
     
 
     
@@ -92,8 +96,8 @@ class Host:
     ## create a packet and enqueue for transmission
     # @param dst_addr: destination address for the packet
     # @param data_S: data being transmitted to the network layer
-    def udt_send(self, dst_addr, id_num, frag_offset, frag_flag, data_S):
-        p = NetworkPacket(dst_addr, id_num, frag_offset, frag_flag, data_S)
+    def udt_send(self, src_addr, dst_addr, id_num, frag_offset, frag_flag, data_S):
+        p = NetworkPacket(src_addr, dst_addr, id_num, frag_offset, frag_flag, data_S)
         self.out_intf_L[0].put(p.to_byte_S()) #send packets always enqueued successfully
         print('%s: sending packet "%s" on the out interface with mtu=%d' % (self, p, self.out_intf_L[0].mtu))
         
@@ -134,9 +138,11 @@ class Router:
     ##@param name: friendly router name for debugging
     # @param intf_count: the number of input and output interfaces 
     # @param max_queue_size: max queue length (passed to Interface)
-    def __init__(self, name, intf_count, max_queue_size):
+    def __init__(self, name, table, intf_count, max_queue_size):
         self.stop = False #for thread termination
         self.name = name
+        #set the routing table for the router
+        self.routing_table = table
         #create a list of interfaces
         self.in_intf_L = [Interface(max_queue_size) for _ in range(intf_count)]
         self.out_intf_L = [Interface(max_queue_size) for _ in range(intf_count)]
@@ -144,7 +150,7 @@ class Router:
     ## called when printing the object
     def __str__(self):
         return 'Router_%s' % (self.name)
-
+    
     ## look through the content of incoming interfaces and forward to
     # appropriate outgoing interfaces
     def forward(self):
@@ -160,9 +166,9 @@ class Router:
                         print('%s: fragmenting packet "%s"' % (self, pkt_S))
                         frag1 = NetworkPacket.from_byte_S(pkt_S[:self.out_intf_L[i].mtu])
                         frag1.frag_flag = 1
-                        frag2 = NetworkPacket.from_byte_S(pkt_S[:13] + pkt_S[self.out_intf_L[i].mtu:])
+                        frag2 = NetworkPacket.from_byte_S(pkt_S[:18] + pkt_S[self.out_intf_L[i].mtu:])
                         frag2.frag_flag = 0
-                        frag2.frag_offset = 13
+                        frag2.frag_offset = 18
                         self.out_intf_L[i].put(frag1.to_byte_S(), True)
                         self.out_intf_L[i].put(frag2.to_byte_S(), True)
                     # HERE you will need to implement a lookup into the 

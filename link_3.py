@@ -45,7 +45,7 @@ class Link:
 	            pkt_S1 = pkt_S[:50] 
 	            #create the second packet by adding the destination address to 
 	            #the remaining characters in the sample data
-	            pkt_S2 = pkt_S[:13] + pkt_S[50:] 
+	            pkt_S2 = pkt_S[:18] + pkt_S[50:] 
 	            #send both new packets through the out interface
 	            self.out_intf.put(pkt_S1)
 	            self.out_intf.put(pkt_S2)
