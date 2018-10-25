@@ -98,27 +98,39 @@ class Host:
     # @param data_S: data being transmitted to the network layer
     def udt_send(self, src_addr, dst_addr, id_num, frag_offset, frag_flag, data_S):
         p = NetworkPacket(src_addr, dst_addr, id_num, frag_offset, frag_flag, data_S)
-        self.out_intf_L[0].put(p.to_byte_S()) #send packets always enqueued successfully
-        print('%s: sending packet "%s" on the out interface with mtu=%d' % (self, p, self.out_intf_L[0].mtu))
+        temp_pkt = p.to_byte_S()
+        header = temp_pkt[0:18]
+        temp_pkt = temp_pkt[len(header):]
+        chunk = self.out_intf_L[0].mtu - len(header)
+        if (len(temp_pkt)+len(header)) > self.out_intf_L[0].mtu:
+            while (len(temp_pkt)+len(header)) > self.out_intf_L[0].mtu:
+                pkt_S = header + temp_pkt[:chunk]
+                self.out_intf_L[0].put(pkt_S)
+                temp_pkt = temp_pkt[chunk:]
+                print('%s: sending packet "%s" on the out interface with mtu=%d' % (self, pkt_S, self.out_intf_L[0].mtu))
+            pkt_S = header + temp_pkt
+            self.out_intf_L[0].put(pkt_S)
+            print('%s: sending packet "%s" on the out interface with mtu=%d' % (self, pkt_S, self.out_intf_L[0].mtu))
+        else:
+            self.out_intf_L[0].put(p.to_byte_S()) #send packets always enqueued successfully
+            print('%s: sending packet "%s" on the out interface with mtu=%d' % (self, p, self.out_intf_L[0].mtu))
         
     ## receive packet from the network layer
     def udt_receive(self):
         pkt_S = self.in_intf_L[0].get()
         if pkt_S is not None:
-            p = NetworkPacket.from_byte_S(pkt_S)
-            if p.frag_flag == 0:
-                print('%s: received packet "%s" on the in interface' % (self, pkt_S))
-            else:
-                print('Packet was fragmented. Reconstructing.\n')
-                pkt_S2 = self.in_intf_L[0].get()
-                if pkt_S2 is not None:
-                    p2 = NetworkPacket.from_byte_S(pkt_S2)
-                    if p.id_num == p2.id_num and p2.frag_flag == 0:
-                        p.frag_flag = 0
-                        recon_pkt_S = p.to_byte_S() + pkt_S2[p2.frag_offset:]
-                        print('%s: reconstructed packet "%s" on the in interface' % (self, recon_pkt_S))
+            recon_pkt_S = pkt_S[:18]
+            while pkt_S is not None:
+                p = NetworkPacket.from_byte_S(pkt_S)
+                if p.frag_flag == 1:
+                    print('Packet was fragmented. Reconstructing.\n')    
+                    recon_pkt_S += pkt_S[p.frag_offset:]    
+                else: 
+                    recon_pkt_S += pkt_S[:p.frag_offset]
+                pkt_S = self.in_intf_L[0].get()
+                print('%s: reconstructed packet "%s" on the in interface' % (self, recon_pkt_S))
 
-       
+                    
     ## thread target for the host to keep receiving data
     def run(self):
         print (threading.currentThread().getName() + ': Starting')
@@ -142,7 +154,7 @@ class Router:
         self.stop = False #for thread termination
         self.name = name
         #set the routing table for the router
-        self.routing_table = table
+        self.table = table
         #create a list of interfaces
         self.in_intf_L = [Interface(max_queue_size) for _ in range(intf_count)]
         self.out_intf_L = [Interface(max_queue_size) for _ in range(intf_count)]
@@ -162,23 +174,26 @@ class Router:
                 #if packet exists make a forwarding decision
                 if pkt_S is not None:
                     p = NetworkPacket.from_byte_S(pkt_S) #parse a packet out
-                    if len(pkt_S) > self.out_intf_L[i].mtu:
+                    out = self.table.get(p.src_addr)
+                    chunk = (self.out_intf_L[out].mtu - 18)
+                    # print('This is the outinterface for the packet: %d' % out)
+                    if len(pkt_S) > self.out_intf_L[out].mtu:
                         print('%s: fragmenting packet "%s"' % (self, pkt_S))
-                        frag1 = NetworkPacket.from_byte_S(pkt_S[:self.out_intf_L[i].mtu])
+                        frag1 = NetworkPacket.from_byte_S(pkt_S[:chunk])
                         frag1.frag_flag = 1
-                        frag2 = NetworkPacket.from_byte_S(pkt_S[:18] + pkt_S[self.out_intf_L[i].mtu:])
+                        frag2 = NetworkPacket.from_byte_S(pkt_S[:18] + pkt_S[chunk:])
                         frag2.frag_flag = 0
                         frag2.frag_offset = 18
-                        self.out_intf_L[i].put(frag1.to_byte_S(), True)
-                        self.out_intf_L[i].put(frag2.to_byte_S(), True)
+                        self.out_intf_L[out].put(frag1.to_byte_S(), True)
+                        self.out_intf_L[out].put(frag2.to_byte_S(), True)
                     # HERE you will need to implement a lookup into the 
                     # forwarding table to find the appropriate outgoing interface
                     # for now we assume the outgoing interface is also i
-                    self.out_intf_L[i].put(p.to_byte_S(), True)
+                    self.out_intf_L[out].put(p.to_byte_S(), True)
                     print('%s: forwarding packet "%s" from interface %d to %d with mtu %d' \
-                        % (self, p, i, i, self.out_intf_L[i].mtu))
+                        % (self, p, i, out, self.out_intf_L[out].mtu))
             except queue.Full:
-                print('%s: packet "%s" lost on interface %d' % (self, p, i))
+                print('%s: packet "%s" lost on interface %d' % (self, p, out))
                 pass
                 
     ## thread target for the host to keep forwarding data
