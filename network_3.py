@@ -174,26 +174,37 @@ class Router:
                 #if packet exists make a forwarding decision
                 if pkt_S is not None:
                     p = NetworkPacket.from_byte_S(pkt_S) #parse a packet out
-                    out = self.table.get(p.src_addr)
-                    chunk = (self.out_intf_L[out].mtu - 18)
+                    out_intf = self.table.get(p.src_addr)
+                    temp_pkt = p.to_byte_S()
+                    header = temp_pkt[0:18]
+                    temp_pkt = temp_pkt[len(header):]
+                    chunk = self.out_intf_L[0].mtu - len(header)
+                    offset = 0
                     # print('This is the outinterface for the packet: %d' % out)
-                    if len(pkt_S) > self.out_intf_L[out].mtu:
-                        print('%s: fragmenting packet "%s"' % (self, pkt_S))
-                        frag1 = NetworkPacket.from_byte_S(pkt_S[:chunk])
-                        frag1.frag_flag = 1
-                        frag2 = NetworkPacket.from_byte_S(pkt_S[:18] + pkt_S[chunk:])
-                        frag2.frag_flag = 0
-                        frag2.frag_offset = 18
-                        self.out_intf_L[out].put(frag1.to_byte_S(), True)
-                        self.out_intf_L[out].put(frag2.to_byte_S(), True)
+                    if (len(temp_pkt)+18) > self.out_intf_L[out_intf].mtu:
+                        while (len(temp_pkt)+18) > self.out_intf_L[out_intf].mtu:
+                            print('%s: fragmenting packet "%s"' % (self, pkt_S))
+                            frag = header + temp_pkt[:chunk]
+                            temp_pkt = temp_pkt[chunk:]
+                            frag_pkt = NetworkPacket.from_byte_S(frag)
+                            frag_pkt.frag_flag = 1
+                            frag_pkt.frag_offset = offset
+                            offset = 18
+                            self.out_intf_L[out_intf].put(frag_pkt.to_byte_S(), True)
+                    else:
+                        frag = header + temp_pkt
+                        frag_pkt = NetworkPacket.from_byte_S(frag)
+                        frag_pkt.frag_flag = 0
+                        frag_pkt.frag_offset = 18
+                        self.out_intf_L[out_intf].put(frag_pkt.to_byte_S(), True)    
                     # HERE you will need to implement a lookup into the 
                     # forwarding table to find the appropriate outgoing interface
                     # for now we assume the outgoing interface is also i
-                    self.out_intf_L[out].put(p.to_byte_S(), True)
+                    self.out_intf_L[out_intf].put(p.to_byte_S(), True)
                     print('%s: forwarding packet "%s" from interface %d to %d with mtu %d' \
-                        % (self, p, i, out, self.out_intf_L[out].mtu))
+                        % (self, p, i, out_intf, self.out_intf_L[out_intf].mtu))
             except queue.Full:
-                print('%s: packet "%s" lost on interface %d' % (self, p, out))
+                print('%s: packet "%s" lost on interface %d' % (self, p, out_intf))
                 pass
                 
     ## thread target for the host to keep forwarding data

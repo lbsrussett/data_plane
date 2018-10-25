@@ -10,7 +10,7 @@ from time import sleep
 
 ##configuration parameters
 router_queue_size = 0 #0 means unlimited
-simulation_time = 5 #give the network sufficient time to transfer all packets before quitting
+simulation_time = 10 #give the network sufficient time to transfer all packets before quitting
 table_a = {}
 table_b = {}
 table_c = {}
