@@ -10,7 +10,7 @@ from time import sleep
 
 ##configuration parameters
 router_queue_size = 0 #0 means unlimited
-simulation_time = 10 #give the network sufficient time to transfer all packets before quitting
+simulation_time = 5 #give the network sufficient time to transfer all packets before quitting
 table_a = {}
 table_b = {}
 table_c = {}
@@ -53,8 +53,8 @@ if __name__ == '__main__':
     link_layer.add_link(link_3.Link(router_a, 1, router_c, 0, 50))
     link_layer.add_link(link_3.Link(router_b, 0, router_d, 0, 50))
     link_layer.add_link(link_3.Link(router_c, 0, router_d, 1, 50))
-    link_layer.add_link(link_3.Link(router_d, 0, server_1, 0, 30))
-    link_layer.add_link(link_3.Link(router_d, 1, server_2, 0, 30))
+    link_layer.add_link(link_3.Link(router_d, 0, server_1, 0, 40))
+    link_layer.add_link(link_3.Link(router_d, 1, server_2, 0, 40))
 
     
     
@@ -77,8 +77,8 @@ if __name__ == '__main__':
     
     #create some send events    
     # for i in range(3):
-    client_1.udt_send(1, 3, 1, 0, 0, 'Client 1 sample data %d (1) that is too long to deliver (1) through and of the current MTU (1) lengths.' % 1)
-    client_2.udt_send(2, 4, 1, 0, 0, 'Client 2 sample data %d (2) that is too long to deliver (2) through the any of the current MTU (2) lengths.' % 1)
+    client_1.udt_send(1, 3, 1, 0, 0, 'Client 1 sample data %d that is too long to deliver through the current MTU lengths.' % 1)
+    client_2.udt_send(2, 4, 1, 0, 0, 'Client 2 sample data %d that is too long to deliver through the current MTU lengths.' % 1)
     
     
     #give the network sufficient time to transfer all packets before quitting

@@ -47,7 +47,7 @@ if __name__ == '__main__':
     
     #create some send events    
     for i in range(3):
-        client.udt_send(2, i, 0, 0, 'Sample data %d that is too long to deliver through the current MTU length of 50 characters.' % i)
+        client.udt_send(2, i, 0, 0, 'Sample data %d that is too long to deliver through the current MTU length.' % i)
     
     
     #give the network sufficient time to transfer all packets before quitting

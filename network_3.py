@@ -117,19 +117,33 @@ class Host:
         
     ## receive packet from the network layer
     def udt_receive(self):
+        output = open("output.txt", "a")
         pkt_S = self.in_intf_L[0].get()
         if pkt_S is not None:
-            recon_pkt_S = pkt_S[:18]
-            while pkt_S is not None:
-                p = NetworkPacket.from_byte_S(pkt_S)
-                if p.frag_flag == 1:
-                    print('Packet was fragmented. Reconstructing.\n')    
-                    recon_pkt_S += pkt_S[p.frag_offset:]    
-                else: 
-                    recon_pkt_S += pkt_S[:p.frag_offset]
-                pkt_S = self.in_intf_L[0].get()
-                print('%s: reconstructed packet "%s" on the in interface' % (self, recon_pkt_S))
-
+            p = NetworkPacket.from_byte_S(pkt_S)
+            if p.frag_flag == 0:
+                print('%s: received packet "%s" on the in interface' % (self, pkt_S))
+            else:
+                print('Packet was fragmented. Reconstructing.\n')
+                pkt_S2 = self.in_intf_L[0].get()
+                if pkt_S2 is not None:
+                    p2 = NetworkPacket.from_byte_S(pkt_S2)
+                    if p.id_num == p2.id_num and p2.frag_flag == 0:
+                        # p.frag_flag = 0
+                        recon_pkt_S = p.to_byte_S() + pkt_S2[p2.frag_offset:]
+                        output.write('Reconstruted packet at Host\n')
+                        output.write('%s: reconstructed packet "%s" on the in interface\n' % (self, recon_pkt_S))
+                        print('%s: reconstructed packet "%s" on the in interface' % (self, recon_pkt_S))
+                elif p.id_num == p2.id_num and p2.frag_flag == 1:
+                    pkt_S3 = self.in_intf_L[0].get()
+                    if pkt_S3 is not None:
+                        p3 = NetworkPacket.from_byte_S(pkt_S3)
+                        if p2.id_num == p3.id_num:
+                            # p.frag_flag = 0
+                            recon_pkt_S = recon_pkt_S + pkt_S3[p3.frag_offset:]
+                            output.write('Reconstructed packet at Host\n')
+                            output.write('%s: reconstructed packet "%s" on the in interface\n' % (self, recon_pkt_S))
+                            print('%s: reconstructed packet "%s" on the in interface' % (self, recon_pkt_S))
                     
     ## thread target for the host to keep receiving data
     def run(self):
@@ -142,7 +156,6 @@ class Host:
                 print (threading.currentThread().getName() + ': Ending')
                 return
         
-
 
 ## Implements a multi-interface router described in class
 class Router:
@@ -166,6 +179,7 @@ class Router:
     ## look through the content of incoming interfaces and forward to
     # appropriate outgoing interfaces
     def forward(self):
+        output = open("output.txt", "a")
         for i in range(len(self.in_intf_L)):
             pkt_S = None
             try:
@@ -182,21 +196,34 @@ class Router:
                     offset = 0
                     # print('This is the outinterface for the packet: %d' % out)
                     if (len(temp_pkt)+18) > self.out_intf_L[out_intf].mtu:
-                        while (len(temp_pkt)+18) > self.out_intf_L[out_intf].mtu:
-                            print('%s: fragmenting packet "%s"' % (self, pkt_S))
-                            frag = header + temp_pkt[:chunk]
-                            temp_pkt = temp_pkt[chunk:]
-                            frag_pkt = NetworkPacket.from_byte_S(frag)
-                            frag_pkt.frag_flag = 1
-                            frag_pkt.frag_offset = offset
-                            offset = 18
-                            self.out_intf_L[out_intf].put(frag_pkt.to_byte_S(), True)
-                    else:
-                        frag = header + temp_pkt
+                        # while (len(temp_pkt)+18) > self.out_intf_L[out_intf].mtu:
+                        output.write('Fragments sent from Router\n')
+                        print('%s: fragmenting packet "%s"' % (self, pkt_S))
+                        frag = header + temp_pkt[:chunk]
+                        temp_pkt = temp_pkt[chunk:]
                         frag_pkt = NetworkPacket.from_byte_S(frag)
-                        frag_pkt.frag_flag = 0
-                        frag_pkt.frag_offset = 18
-                        self.out_intf_L[out_intf].put(frag_pkt.to_byte_S(), True)    
+                        frag_pkt.frag_flag = 1
+                        frag_pkt.frag_offset = offset
+                        offset = 18
+                        output.write('Fragment from %s: "%s"\n' % (self, frag))
+                        self.out_intf_L[out_intf].put(frag_pkt.to_byte_S(), True)
+                        f2 = header + temp_pkt[:chunk]
+                        temp_pkt = temp_pkt[chunk:]
+                        f2_pkt = NetworkPacket.from_byte_S(f2)
+                        if len(temp_pkt) > chunk:
+                            f2_pkt.frag_flag = 1
+                            f2_pkt.frag_offset = offset
+                            output.write('Fragment from %s: "%s"\n' % (self, f2_pkt.to_byte_S()))
+                            self.out_intf_L[out_intf].put(f2_pkt.to_byte_S(), True)
+                            temp_pkt = temp_pkt[chunk:]
+                        else:
+                            f3 = header +temp_pkt
+                            f3_pkt = NetworkPacket.from_byte_S(f2)    
+                            f3_pkt.frag_flag = 0
+                            f3_pkt.frag_offset = 18
+                            output.write('Fragment from %s: "%s"\n' % (self, f3_pkt.to_byte_S()))
+                            self.out_intf_L[out_intf].put(f3_pkt.to_byte_S(), True)
+                      
                     # HERE you will need to implement a lookup into the 
                     # forwarding table to find the appropriate outgoing interface
                     # for now we assume the outgoing interface is also i
